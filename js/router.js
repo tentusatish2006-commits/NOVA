@@ -10,11 +10,11 @@ import { renderLoginPage, renderSignupPage, showAuthMessage } from './pages/Auth
 import { renderExecutiveDashboard } from './pages/ExecutiveDashboard.js';
 import { renderBusinessDiagnosisPage, renderCausePanel, runFullDiagnosis } from './pages/BusinessDiagnosis.js';
 import { renderAIBusinessAnalystPage, runAIQuery } from './pages/AIBusinessAnalyst.js';
-import { renderCustomerIntelligencePage } from './pages/CustomerIntelligence.js';
+import { renderCustomerIntelligencePage, viewCustomerDetail } from './pages/CustomerIntelligence.js';
 import { renderRetentionIntelligencePage, triggerRescueAction } from './pages/RetentionIntelligence.js';
 import { renderCustomerSupportPage } from './pages/CustomerSupport.js';
 import { renderAISupportAssistantPage, runSupportSynthesis } from './pages/AISupportAssistant.js';
-import { renderStoreIntelligencePage } from './pages/StoreIntelligence.js';
+import { renderStoreIntelligencePage, viewStoreDetail } from './pages/StoreIntelligence.js';
 import { renderInventoryIntelligencePage } from './pages/InventoryIntelligence.js';
 import { renderDeliveryOperationsPage } from './pages/DeliveryOperations.js';
 import { renderAIDeliveryPredictionPage, runDeliveryPrediction } from './pages/AIDeliveryPrediction.js';
@@ -23,7 +23,7 @@ import { renderMarketingIntelligencePage } from './pages/MarketingIntelligence.j
 import { renderCouponAnalyticsPage } from './pages/CouponAnalytics.js';
 import { renderAIRecommendationsPage } from './pages/AIRecommendations.js';
 import { renderFinancialImpactPage } from './pages/FinancialImpact.js';
-import { renderBusinessSimulatorPage } from './pages/BusinessSimulator.js';
+import { renderBusinessSimulatorPage, initSimulatorControls, runBusinessSimulation, saveSimulationScenario } from './pages/BusinessSimulator.js';
 import { renderAnalyticsPage } from './pages/Analytics.js';
 import { renderAlertsPage } from './pages/Alerts.js';
 
@@ -136,11 +136,11 @@ class App {
         case '/dashboard': case '/executive': return renderExecutiveDashboard();
         case '/diagnosis': return renderBusinessDiagnosisPage();
         case '/ai-analyst': return renderAIBusinessAnalystPage();
-        case '/customers': return renderCustomerIntelligencePage(this.custSegment, this.custSearch);
+        case '/customers': return renderCustomerIntelligencePage();
         case '/retention': return renderRetentionIntelligencePage();
         case '/support': return renderCustomerSupportPage();
         case '/support/assistant': case '/ai-support': return renderAISupportAssistantPage();
-        case '/stores': return renderStoreIntelligencePage(this.storeCity, this.storeSearch);
+        case '/stores': return renderStoreIntelligencePage();
         case '/inventory': return renderInventoryIntelligencePage();
         case '/delivery': return renderDeliveryOperationsPage(this.deliveryStatus);
         case '/delivery-prediction': case '/ai-delivery': return renderAIDeliveryPredictionPage();
@@ -311,7 +311,6 @@ class App {
       });
     }
 
-    // AI Delivery Delay Prediction
     const btnPred = document.getElementById('btn-run-delivery-pred');
     if (btnPred) {
       btnPred.addEventListener('click', async (e) => {
@@ -325,13 +324,52 @@ class App {
       });
     }
 
-    // Cancellation — Generate AI Action Plan
     const btnCancelPlan = document.getElementById('btn-gen-cancel-plan');
     if (btnCancelPlan) {
       btnCancelPlan.addEventListener('click', async (e) => {
         e.preventDefault();
         await generateCancelActionPlan();
       });
+    }
+
+    // Customer View
+    document.querySelectorAll('.btn-view-customer').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        viewCustomerDetail(btn.getAttribute('data-custid') || '');
+      });
+    });
+
+    // Store View Details
+    document.querySelectorAll('.btn-store-detail').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        viewStoreDetail(btn.getAttribute('data-storeid') || '');
+      });
+    });
+
+    // Business Simulator
+    if (this.currentRoute === '/simulator') {
+      try { initSimulatorControls(); } catch (e) {}
+      const btnSim = document.getElementById('btn-run-sim');
+      if (btnSim) {
+        btnSim.addEventListener('click', (e) => {
+          e.preventDefault();
+          btnSim.disabled = true;
+          const prev = btnSim.textContent;
+          btnSim.textContent = 'Computing…';
+          runBusinessSimulation();
+          btnSim.disabled = false;
+          btnSim.textContent = prev;
+        });
+      }
+      const btnSave = document.getElementById('btn-save-sim-scenario');
+      if (btnSave) {
+        btnSave.addEventListener('click', (e) => {
+          e.preventDefault();
+          saveSimulationScenario();
+        });
+      }
     }
 
     document.querySelectorAll('.btn-analytics-tab').forEach((btn) => {
