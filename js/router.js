@@ -1,9 +1,10 @@
-// NOVA CART - Router with Supabase Auth
+// NOVA CART - Router with Supabase Auth + PDF/buttons
 import { Canvas3D } from './components/3dCanvas.js';
 import { renderSidebar } from './components/Sidebar.js';
 import { renderHeader } from './components/TopBar.js';
 import { db } from './services/db.js';
 import { auth } from './services/auth.js';
+import { downloadPdfReport, downloadCsv } from './services/pdfExport.js';
 import { renderLandingPage, initLandingN3D } from './pages/HomeLanding.js';
 import { renderLoginPage, renderSignupPage, showAuthMessage } from './pages/AuthPages.js';
 import { renderExecutiveDashboard } from './pages/ExecutiveDashboard.js';
@@ -27,10 +28,6 @@ import { renderBusinessSimulatorPage } from './pages/BusinessSimulator.js';
 import { renderAnalyticsPage } from './pages/Analytics.js';
 import { renderAlertsPage } from './pages/Alerts.js';
 
-function defaultUser() {
-  return { name: 'Dr. Satish Kumar', email: 'satish@novacart.in', role: 'CEO' };
-}
-
 class App {
   constructor() {
     this.currentUser = null;
@@ -45,9 +42,7 @@ class App {
   }
 
   async init() {
-    try {
-      this.canvas = new Canvas3D('canvas-container');
-    } catch (e) {}
+    try { this.canvas = new Canvas3D('canvas-container'); } catch (e) {}
     const restored = await auth.restoreSession();
     if (restored) {
       this.currentUser = restored;
@@ -62,10 +57,7 @@ class App {
         }
       } catch (e) {}
     }
-    window.addEventListener('hashchange', () => {
-      this.parseRoute();
-      this.render();
-    });
+    window.addEventListener('hashchange', () => { this.parseRoute(); this.render(); });
     this.render();
   }
 
@@ -83,7 +75,7 @@ class App {
   }
 
   setCurrentUserRole(role) {
-    if (!this.currentUser) this.currentUser = defaultUser();
+    if (!this.currentUser) return;
     this.currentUser.role = role;
     localStorage.setItem('nova_cart_user', JSON.stringify(this.currentUser));
     this.render();
@@ -101,6 +93,7 @@ class App {
   }
 
   completeLogin(user) {
+    if (!user || !user.role) return;
     this.currentUser = user;
     localStorage.setItem('nova_cart_user', JSON.stringify(user));
     localStorage.setItem('nova_cart_logged_in', '1');
@@ -133,7 +126,7 @@ class App {
     }
 
     const mainPadding = this.currentRoute === '/live-map' ? '0' : '24px 32px';
-    const user = this.currentUser || defaultUser();
+    const user = this.currentUser || { name: 'Guest', email: '', role: 'User' };
     root.innerHTML = `
       <div style="display:flex; width:100vw; height:100vh; overflow:hidden;">
         ${renderSidebar(this.currentRoute)}
@@ -156,52 +149,27 @@ class App {
     const r = this.currentRoute;
     try {
       switch (r) {
-        case '/dashboard':
-        case '/executive':
-          return renderExecutiveDashboard();
-        case '/diagnosis':
-          return renderBusinessDiagnosisPage();
-        case '/ai-analyst':
-          return renderAIBusinessAnalystPage();
-        case '/customers':
-          return renderCustomerIntelligencePage(this.custSegment, this.custSearch);
-        case '/retention':
-          return renderRetentionIntelligencePage();
-        case '/support':
-          return renderCustomerSupportPage();
-        case '/support/assistant':
-        case '/ai-support':
-          return renderAISupportAssistantPage();
-        case '/stores':
-          return renderStoreIntelligencePage(this.storeCity, this.storeSearch);
-        case '/inventory':
-          return renderInventoryIntelligencePage();
-        case '/delivery':
-          return renderDeliveryOperationsPage(this.deliveryStatus);
-        case '/live-map':
-          return renderLiveDeliveryMapPage();
-        case '/delivery-prediction':
-        case '/ai-delivery':
-          return renderAIDeliveryPredictionPage();
-        case '/cancellations':
-          return renderCancellationIntelligencePage();
-        case '/marketing':
-          return renderMarketingIntelligencePage();
-        case '/coupons':
-          return renderCouponAnalyticsPage();
-        case '/recommendations':
-          return renderAIRecommendationsPage();
-        case '/impact':
-        case '/financial':
-          return renderFinancialImpactPage();
-        case '/simulator':
-          return renderBusinessSimulatorPage();
-        case '/analytics':
-          return renderAnalyticsPage(this.analyticsTab);
-        case '/alerts':
-          return renderAlertsPage();
-        default:
-          return renderExecutiveDashboard();
+        case '/dashboard': case '/executive': return renderExecutiveDashboard();
+        case '/diagnosis': return renderBusinessDiagnosisPage();
+        case '/ai-analyst': return renderAIBusinessAnalystPage();
+        case '/customers': return renderCustomerIntelligencePage(this.custSegment, this.custSearch);
+        case '/retention': return renderRetentionIntelligencePage();
+        case '/support': return renderCustomerSupportPage();
+        case '/support/assistant': case '/ai-support': return renderAISupportAssistantPage();
+        case '/stores': return renderStoreIntelligencePage(this.storeCity, this.storeSearch);
+        case '/inventory': return renderInventoryIntelligencePage();
+        case '/delivery': return renderDeliveryOperationsPage(this.deliveryStatus);
+        case '/live-map': return renderLiveDeliveryMapPage();
+        case '/delivery-prediction': case '/ai-delivery': return renderAIDeliveryPredictionPage();
+        case '/cancellations': return renderCancellationIntelligencePage();
+        case '/marketing': return renderMarketingIntelligencePage();
+        case '/coupons': return renderCouponAnalyticsPage();
+        case '/recommendations': return renderAIRecommendationsPage();
+        case '/impact': case '/financial': return renderFinancialImpactPage();
+        case '/simulator': return renderBusinessSimulatorPage();
+        case '/analytics': return renderAnalyticsPage(this.analyticsTab);
+        case '/alerts': return renderAlertsPage();
+        default: return renderExecutiveDashboard();
       }
     } catch (e) {
       return '<div class="glass-card" style="padding:24px;"><h2>Page Error</h2><pre>' + e.message + '</pre></div>';
@@ -229,16 +197,14 @@ class App {
       });
     });
     if (this.currentRoute === '/' || this.currentRoute === '') {
-      try {
-        initLandingN3D();
-      } catch (err) {}
+      try { initLandingN3D(); } catch (err) {}
     }
 
     document.querySelectorAll('.btn-demo-login').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         const role = (e.currentTarget || e.target).getAttribute('data-role') || 'CEO';
-        this.completeLogin({ name: 'Dr. Satish Kumar', email: 'satish@novacart.in', role, provider: 'demo' });
+        this.completeLogin({ name: 'Demo ' + role, email: 'demo@novacart.in', role, provider: 'demo' });
       });
     });
 
@@ -249,20 +215,11 @@ class App {
         const email = (document.getElementById('login-email') || {}).value || '';
         const password = (document.getElementById('login-password') || {}).value || '';
         const btn = document.getElementById('login-submit');
-        if (btn) {
-          btn.disabled = true;
-          btn.textContent = 'Signing in…';
-        }
+        if (btn) { btn.disabled = true; btn.textContent = 'Signing in…'; }
         const result = await auth.login({ email, password });
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = 'Sign In & Enter Command Center';
-        }
-        if (result.ok) {
-          this.completeLogin(result.user);
-        } else {
-          showAuthMessage(result.message || 'Login failed');
-        }
+        if (btn) { btn.disabled = false; btn.textContent = 'Sign In & Enter Command Center'; }
+        if (result.ok) this.completeLogin(result.user);
+        else showAuthMessage(result.message || 'Invalid credentials');
       });
     }
 
@@ -270,29 +227,18 @@ class App {
     if (signupForm) {
       signupForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const name = (document.getElementById('signup-name') || {}).value || 'User';
+        const name = (document.getElementById('signup-name') || {}).value || '';
         const email = (document.getElementById('signup-email') || {}).value || '';
         const password = (document.getElementById('signup-password') || {}).value || '';
         const role = (document.getElementById('signup-role') || {}).value || 'CEO';
         const btn = document.getElementById('signup-submit');
-        if (btn) {
-          btn.disabled = true;
-          btn.textContent = 'Creating account…';
-        }
+        if (btn) { btn.disabled = true; btn.textContent = 'Creating account…'; }
         const result = await auth.signup({ name, email, password, role });
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = 'Create Account';
-        }
+        if (btn) { btn.disabled = false; btn.textContent = 'Create Account'; }
         if (result.ok) {
-          if (result.needsConfirmation) {
-            showAuthMessage(result.message || 'Check your email to confirm, then sign in.', 'info');
-          } else {
-            this.completeLogin(result.user);
-          }
-        } else {
-          showAuthMessage(result.message || 'Signup failed');
-        }
+          if (result.needsConfirmation) showAuthMessage(result.message || 'Check your email to confirm, then sign in.', 'info');
+          else this.completeLogin(result.user);
+        } else showAuthMessage(result.message || 'Signup failed');
       });
     }
   }
@@ -301,23 +247,79 @@ class App {
     document.querySelectorAll('[data-nav], a[href^="#/"]').forEach((el) => {
       el.addEventListener('click', (e) => {
         const dest = el.getAttribute('data-nav') || el.getAttribute('href');
-        if (dest && dest.includes('#/')) {
-          e.preventDefault();
-          this.navigate(dest);
-        }
+        if (dest && dest.includes('#/')) { e.preventDefault(); this.navigate(dest); }
       });
     });
     const roleSel = document.getElementById('role-selector');
     if (roleSel) roleSel.addEventListener('change', (e) => this.setCurrentUserRole(e.target.value));
     const btnLogout = document.getElementById('btn-logout');
     if (btnLogout) btnLogout.addEventListener('click', () => this.logout());
+
+    const btnPdf = document.getElementById('btn-download-pdf');
+    if (btnPdf) {
+      btnPdf.addEventListener('click', () => {
+        const u = this.currentUser || {};
+        downloadPdfReport('NOVA CART Report — ' + (this.currentRoute || 'dashboard'), `
+          <h2>Session</h2>
+          <div class="card">User: <b>${u.name || ''}</b><br>Email: ${u.email || ''}<br>Role: ${u.role || ''}<br>Page: ${this.currentRoute}</div>
+          <h2>Executive Snapshot</h2>
+          <div class="card"><p>Registered users: 120,000 · Monthly orders: 38,500 · Revenue: ₹26.1L · Repeat rate: 27%</p>
+          <p>AI summary: Acquisition growth is strong; retention, delivery SLA and support need intervention.</p></div>
+          <h2>Priority actions</h2>
+          <ul><li>Second-order retention intervention</li><li>Inventory pre-allocation engine</li><li>Delivery SLA for first 2 orders</li></ul>
+        `);
+      });
+    }
+
+    document.querySelectorAll('.btn-analytics-tab').forEach((btn) => {
+      btn.addEventListener('click', () => { this.analyticsTab = btn.getAttribute('data-tab') || 'Finance'; this.render(); });
+    });
+
+    const btnCsv = document.getElementById('btn-export-csv');
+    if (btnCsv) {
+      btnCsv.addEventListener('click', () => {
+        downloadCsv('nova-analytics.csv', [['Metric','Value'],['Registered Users','120000'],['Monthly Orders','38500'],['Revenue','2610000'],['Repeat Rate','27%'],['Cancellation Rate','11%'],['Avg Delivery Min','37']]);
+      });
+    }
+
+    document.querySelectorAll('.cause-tab').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.cause-tab').forEach((b) => { b.classList.remove('btn-futuristic'); b.classList.add('btn-futuristic-secondary'); });
+        btn.classList.remove('btn-futuristic-secondary');
+        btn.classList.add('btn-futuristic');
+        const cause = btn.getAttribute('data-cause');
+        const panel = document.getElementById('cause-detail-panel');
+        if (panel && cause) panel.innerHTML = '<p style="color:var(--text-muted);font-size:13px;">Showing analysis for <b style="color:#fff;">' + cause + '</b>.</p>';
+      });
+    });
+
+    document.querySelectorAll('.btn-rec-action').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        btn.textContent = (btn.getAttribute('data-action') || 'Done') + ' ✓';
+        btn.disabled = true;
+      });
+    });
+
+    document.querySelectorAll('.btn-ack-alert').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        try { if (db.acknowledgeAlert) db.acknowledgeAlert(btn.getAttribute('data-altid')); } catch (e) {}
+        btn.textContent = 'Acknowledged';
+        btn.disabled = true;
+      });
+    });
+
+    const btnDiag = document.getElementById('btn-run-diagnosis');
+    if (btnDiag) {
+      btnDiag.addEventListener('click', () => {
+        btnDiag.textContent = 'Running AI Diagnosis…';
+        setTimeout(() => { btnDiag.textContent = 'Diagnosis Complete ✓'; this.navigate('#/diagnosis'); }, 600);
+      });
+    }
   }
 }
 
 if (document.readyState === 'loading') {
-  window.addEventListener('DOMContentLoaded', () => {
-    window.novaApp = new App();
-  });
+  window.addEventListener('DOMContentLoaded', () => { window.novaApp = new App(); });
 } else {
   window.novaApp = new App();
 }
