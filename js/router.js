@@ -17,9 +17,8 @@ import { renderAISupportAssistantPage, runSupportSynthesis } from './pages/AISup
 import { renderStoreIntelligencePage } from './pages/StoreIntelligence.js';
 import { renderInventoryIntelligencePage } from './pages/InventoryIntelligence.js';
 import { renderDeliveryOperationsPage } from './pages/DeliveryOperations.js';
-import { renderLiveDeliveryMapPage, initLiveMapLeaflet } from './pages/LiveDeliveryMap.js';
-import { renderAIDeliveryPredictionPage } from './pages/AIDeliveryPrediction.js';
-import { renderCancellationIntelligencePage } from './pages/CancellationIntelligence.js';
+import { renderAIDeliveryPredictionPage, runDeliveryPrediction } from './pages/AIDeliveryPrediction.js';
+import { renderCancellationIntelligencePage, generateCancelActionPlan } from './pages/CancellationIntelligence.js';
 import { renderMarketingIntelligencePage } from './pages/MarketingIntelligence.js';
 import { renderCouponAnalyticsPage } from './pages/CouponAnalytics.js';
 import { renderAIRecommendationsPage } from './pages/AIRecommendations.js';
@@ -31,12 +30,9 @@ import { renderAlertsPage } from './pages/Alerts.js';
 class App {
   constructor() {
     this.currentUser = null;
-    this.custSegment = 'All';
-    this.custSearch = '';
-    this.storeCity = 'All';
-    this.storeSearch = '';
-    this.deliveryStatus = 'All';
-    this.analyticsTab = 'Finance';
+    this.custSegment = 'All'; this.custSearch = '';
+    this.storeCity = 'All'; this.storeSearch = '';
+    this.deliveryStatus = 'All'; this.analyticsTab = 'Finance';
     this.parseRoute();
     this.init();
   }
@@ -118,22 +114,18 @@ class App {
       this.bindStandaloneEvents();
       return;
     }
-    const mainPadding = this.currentRoute === '/live-map' ? '0' : '24px 32px';
     const user = this.currentUser || { name: 'Guest', email: '', role: 'User' };
     root.innerHTML = `
       <div style="display:flex; width:100vw; height:100vh; overflow:hidden;">
         ${renderSidebar(this.currentRoute)}
         <div style="flex:1; display:flex; flex-direction:column; min-width:0; height:100vh; overflow:hidden;">
           ${renderHeader(this.currentRoute, user)}
-          <main id="page-main" style="flex:1; display:flex; flex-direction:column; padding:${mainPadding}; overflow-y:auto; overflow-x:hidden;">
+          <main id="page-main" style="flex:1; display:flex; flex-direction:column; padding:24px 32px; overflow-y:auto; overflow-x:hidden;">
             ${this.renderRouteContent()}
           </main>
         </div>
       </div>
     `;
-    if (this.currentRoute === '/live-map') {
-      setTimeout(() => initLiveMapLeaflet(this.storeCity !== 'All' ? this.storeCity : 'Bengaluru'), 120);
-    }
     this.bindAppEvents();
   }
 
@@ -151,7 +143,6 @@ class App {
         case '/stores': return renderStoreIntelligencePage(this.storeCity, this.storeSearch);
         case '/inventory': return renderInventoryIntelligencePage();
         case '/delivery': return renderDeliveryOperationsPage(this.deliveryStatus);
-        case '/live-map': return renderLiveDeliveryMapPage();
         case '/delivery-prediction': case '/ai-delivery': return renderAIDeliveryPredictionPage();
         case '/cancellations': return renderCancellationIntelligencePage();
         case '/marketing': return renderMarketingIntelligencePage();
@@ -249,12 +240,7 @@ class App {
       btnPdf.addEventListener('click', (e) => {
         e.preventDefault();
         const u = this.currentUser || {};
-        downloadPdfReport('NOVA_CART_Report_' + (this.currentRoute || 'dashboard').replace(/\//g, ''), `
-          <h2>Session</h2>
-          <div class="card">User: <b>${u.name || ''}</b><br>Email: ${u.email || ''}<br>Role: ${u.role || ''}<br>Page: ${this.currentRoute}</div>
-          <h2>Executive Snapshot</h2>
-          <div class="card"><p>Registered users: 120,000 · Monthly orders: 38,500 · Revenue: ₹26.1L · Repeat rate: 27%</p></div>
-        `);
+        downloadPdfReport('NOVA_CART_Report', `<h2>Session</h2><div class="card">User: <b>${u.name || ''}</b><br>Role: ${u.role || ''}</div>`);
       });
     }
 
@@ -305,7 +291,6 @@ class App {
       });
     });
 
-    // Retention — Trigger Rescue Action
     document.querySelectorAll('.btn-trigger-retention').forEach((btn) => {
       btn.addEventListener('click', async (e) => {
         e.preventDefault();
@@ -313,7 +298,6 @@ class App {
       });
     });
 
-    // AI Support — Retrieve & Synthesize
     const supportForm = document.getElementById('support-lookup-form');
     if (supportForm) {
       supportForm.addEventListener('submit', async (e) => {
@@ -324,6 +308,29 @@ class App {
         if (btn) { btn.disabled = true; btn.textContent = 'Synthesizing…'; }
         await runSupportSynthesis(cust, order);
         if (btn) { btn.disabled = false; btn.textContent = '🔍 Retrieve & Synthesize'; }
+      });
+    }
+
+    // AI Delivery Delay Prediction
+    const btnPred = document.getElementById('btn-run-delivery-pred');
+    if (btnPred) {
+      btnPred.addEventListener('click', async (e) => {
+        e.preventDefault();
+        btnPred.disabled = true;
+        const prev = btnPred.textContent;
+        btnPred.textContent = 'Predicting…';
+        await runDeliveryPrediction();
+        btnPred.disabled = false;
+        btnPred.textContent = prev;
+      });
+    }
+
+    // Cancellation — Generate AI Action Plan
+    const btnCancelPlan = document.getElementById('btn-gen-cancel-plan');
+    if (btnCancelPlan) {
+      btnCancelPlan.addEventListener('click', async (e) => {
+        e.preventDefault();
+        await generateCancelActionPlan();
       });
     }
 
