@@ -1,4 +1,4 @@
-// NOVA CART - Futuristic Landing Page with interactive 3D glowing N
+// NOVA CART - Landing Page with interactive 3D glowing N
 
 export function renderLandingPage() {
   return `
@@ -13,7 +13,7 @@ export function renderLandingPage() {
         </div>
         <div style="display: flex; align-items: center; gap: 16px;">
           <a href="#/login" class="btn-futuristic-secondary" data-nav="#/login" style="font-size: 13px; padding: 10px 22px;">Sign In</a>
-          <a href="#/dashboard" class="btn-futuristic" data-nav="#/dashboard" style="font-size: 13px; padding: 10px 24px;">Enter Command Center →</a>
+          <a href="#/signup" class="btn-futuristic" data-nav="#/signup" style="font-size: 13px; padding: 10px 24px;">Sign Up →</a>
         </div>
       </div>
       <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 0 60px; position: relative; gap: 80px; flex-wrap: wrap;">
@@ -22,8 +22,8 @@ export function renderLandingPage() {
           <h1 style="font-size: 52px; font-weight: 800; line-height: 1.1; letter-spacing: -1px; text-shadow: 0 0 40px rgba(0, 243, 255, 0.3);">Turn Business Signals Into <br><span class="gradient-text-cyan">Intelligent Rescue Decisions.</span></h1>
           <p style="font-size: 17px; color: var(--text-muted); line-height: 1.65;">Connecting 620 local stores across 3 Indian cities. Real-time decision intelligence for quick-commerce: evidence, diagnosis, retention, and business impact projection.</p>
           <div style="display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px;">
-            <a href="#/dashboard" class="btn-futuristic glow-cyan" data-nav="#/dashboard" style="font-size: 15px; padding: 14px 34px; border-radius: 12px; cursor: pointer;">🚀 ENTER COMMAND CENTER</a>
-            <a href="#/diagnosis" class="btn-futuristic-secondary" data-nav="#/diagnosis" style="font-size: 15px; padding: 14px 28px; border-radius: 12px; cursor: pointer;">🔍 VIEW DIAGNOSIS</a>
+            <a href="#/login" class="btn-futuristic glow-cyan" data-nav="#/login" data-after-login="#/dashboard" style="font-size: 15px; padding: 14px 34px; border-radius: 12px; cursor: pointer;">🚀 ENTER COMMAND CENTER</a>
+            <a href="#/login" class="btn-futuristic-secondary" data-nav="#/login" data-after-login="#/diagnosis" style="font-size: 15px; padding: 14px 28px; border-radius: 12px; cursor: pointer;">🔍 VIEW DIAGNOSIS</a>
           </div>
           <div style="display: flex; gap: 28px; margin-top: 28px; flex-wrap: wrap;">
             <div><div style="font-size: 28px; font-weight: 800; color: #fff;">120K</div><div style="font-size: 11px; color: var(--text-dim); font-family: var(--font-mono); letter-spacing: 1px;">REGISTERED USERS</div></div>

@@ -1,4 +1,4 @@
-// NOVA CART - Master Application Router
+// NOVA CART - Master Application Router (auth required for command center)
 import { Canvas3D } from './components/3dCanvas.js';
 import { renderSidebar } from './components/Sidebar.js';
 import { renderHeader } from './components/TopBar.js';
@@ -34,18 +34,25 @@ function defaultUser() {
 
 class App {
   constructor() {
+    this.currentUser = null;
     try {
       const raw = localStorage.getItem('nova_cart_user');
-      const u = raw ? JSON.parse(raw) : null;
-      this.currentUser = (u && u.role) ? u : defaultUser();
-    } catch (e) {
-      this.currentUser = defaultUser();
-    }
+      if (raw) {
+        const u = JSON.parse(raw);
+        if (u && u.role && localStorage.getItem('nova_cart_logged_in') === '1') {
+          this.currentUser = u;
+        }
+      }
+    } catch (e) {}
     this.custSegment = 'All'; this.custSearch = '';
     this.storeCity = 'All'; this.storeSearch = '';
     this.deliveryStatus = 'All'; this.analyticsTab = 'Finance';
     this.parseRoute();
     this.init();
+  }
+
+  isAuthenticated() {
+    return !!(this.currentUser && this.currentUser.role && localStorage.getItem('nova_cart_logged_in') === '1');
   }
 
   parseRoute() {
@@ -72,7 +79,9 @@ class App {
 
   logout() {
     localStorage.removeItem('nova_cart_user');
-    this.currentUser = defaultUser();
+    localStorage.removeItem('nova_cart_logged_in');
+    localStorage.removeItem('nova_cart_after_login');
+    this.currentUser = null;
     window.location.hash = '#/login';
   }
 
@@ -81,15 +90,31 @@ class App {
     window.location.hash = hash.startsWith('#') ? hash : '#' + hash;
   }
 
+  completeLogin(user) {
+    this.currentUser = user;
+    localStorage.setItem('nova_cart_user', JSON.stringify(user));
+    localStorage.setItem('nova_cart_logged_in', '1');
+    const next = localStorage.getItem('nova_cart_after_login') || '#/dashboard';
+    localStorage.removeItem('nova_cart_after_login');
+    this.navigate(next);
+  }
+
   render() {
     const root = document.getElementById('app-root');
     if (!root) return;
-    if (!this.currentUser) this.currentUser = defaultUser();
 
-    const isStandalone = this.currentRoute === '/' || this.currentRoute === '/login' || this.currentRoute === '/signup';
+    const publicRoutes = ['/', '/login', '/signup'];
+    const isStandalone = publicRoutes.includes(this.currentRoute);
+
+    // Auth gate: any non-public route requires login
+    if (!isStandalone && !this.isAuthenticated()) {
+      localStorage.setItem('nova_cart_after_login', '#' + this.currentRoute);
+      this.navigate('#/login');
+      return;
+    }
 
     if (isStandalone) {
-      if (this.currentRoute === '/login') root.innerHTML = renderLoginPage(this.currentUser.role);
+      if (this.currentRoute === '/login') root.innerHTML = renderLoginPage((this.currentUser && this.currentUser.role) || 'CEO');
       else if (this.currentRoute === '/signup') root.innerHTML = renderSignupPage();
       else root.innerHTML = renderLandingPage();
       this.bindStandaloneEvents();
@@ -152,13 +177,20 @@ class App {
     document.querySelectorAll('[data-nav]').forEach(el => {
       el.addEventListener('click', (e) => {
         e.preventDefault();
+        const after = el.getAttribute('data-after-login');
+        if (after) localStorage.setItem('nova_cart_after_login', after);
         this.navigate(el.getAttribute('data-nav') || el.getAttribute('href'));
       });
     });
     document.querySelectorAll('a[href^="#/"]').forEach(a => {
       a.addEventListener('click', (e) => {
         const href = a.getAttribute('href');
-        if (href && href.startsWith('#/')) { e.preventDefault(); this.navigate(href); }
+        if (href && href.startsWith('#/')) {
+          e.preventDefault();
+          const after = a.getAttribute('data-after-login');
+          if (after) localStorage.setItem('nova_cart_after_login', after);
+          this.navigate(href);
+        }
       });
     });
     if (this.currentRoute === '/' || this.currentRoute === '') {
@@ -168,9 +200,7 @@ class App {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         const role = (e.currentTarget || e.target).getAttribute('data-role') || 'CEO';
-        this.currentUser = { name: 'Dr. Satish Kumar', email: 'satish@novacart.in', role };
-        localStorage.setItem('nova_cart_user', JSON.stringify(this.currentUser));
-        this.navigate('#/dashboard');
+        this.completeLogin({ name: 'Dr. Satish Kumar', email: 'satish@novacart.in', role });
       });
     });
     const loginForm = document.getElementById('login-form');
@@ -178,9 +208,7 @@ class App {
       loginForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const email = (document.getElementById('login-email') || {}).value || 'satish@novacart.in';
-        this.currentUser = { name: 'Dr. Satish Kumar', email, role: 'CEO' };
-        localStorage.setItem('nova_cart_user', JSON.stringify(this.currentUser));
-        this.navigate('#/dashboard');
+        this.completeLogin({ name: 'Dr. Satish Kumar', email, role: 'CEO' });
       });
     }
     const signupForm = document.getElementById('signup-form');
@@ -190,9 +218,7 @@ class App {
         const name = (document.getElementById('signup-name') || {}).value || 'New User';
         const email = (document.getElementById('signup-email') || {}).value || 'user@novacart.in';
         const role = (document.getElementById('signup-role') || {}).value || 'CEO';
-        this.currentUser = { name, email, role };
-        localStorage.setItem('nova_cart_user', JSON.stringify(this.currentUser));
-        this.navigate('#/dashboard');
+        this.completeLogin({ name, email, role });
       });
     }
   }
