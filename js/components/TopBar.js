@@ -1,69 +1,45 @@
-// NOVA CART - Top Header (no search; PDF after user name)
-import { db } from '../services/db.js';
-
-export function renderHeader(currentRoute, currentUser) {
-  const user = currentUser || {};
-  const displayName = user.name || user.email || 'Guest';
-  const displayRole = user.role || 'User';
-  const initial = (displayName.trim().charAt(0) || '?').toUpperCase();
-  const route = currentRoute || '/dashboard';
-
-  const routeNames = {
-    '/dashboard': 'Executive Command Center',
+// NOVA CART - Top Bar / Header
+export function renderHeader(currentRoute = '/dashboard', user = {}) {
+  const titles = {
+    '/dashboard': 'Executive Dashboard',
+    '/executive': 'Executive Dashboard',
     '/diagnosis': 'Business Diagnosis',
     '/ai-analyst': 'AI Business Analyst',
     '/customers': 'Customer Intelligence',
     '/retention': 'Retention Intelligence',
     '/support': 'Customer Support',
+    '/support/assistant': 'AI Support Assistant',
+    '/ai-support': 'AI Support Assistant',
     '/stores': 'Store Intelligence',
     '/inventory': 'Inventory Intelligence',
     '/delivery': 'Delivery Operations',
-    '/live-map': 'Live Delivery Map',
     '/delivery-prediction': 'AI Delivery Prediction',
+    '/ai-delivery': 'AI Delivery Prediction',
     '/cancellations': 'Cancellation Intelligence',
     '/marketing': 'Marketing Intelligence',
     '/coupons': 'Coupon Analytics',
-    '/recommendations': 'AI Recommendations Center',
-    '/support/assistant': 'AI Support Assistant',
-    '/alerts': 'Real-time Alerts Center',
-    '/impact': 'Financial Impact Dashboard',
-    '/simulator': 'What-If Business Simulator',
+    '/recommendations': 'AI Recommendations',
+    '/impact': 'Financial Impact',
+    '/financial': 'Financial Impact',
+    '/simulator': 'Business Simulator',
     '/analytics': 'Advanced Analytics',
+    '/alerts': 'Alerts Center',
   };
 
-  const title = routeNames[route] || 'Command Center';
-  let unacknowledgedAlerts = 0;
-  try {
-    unacknowledgedAlerts = db.getAlerts().filter((a) => a.status === 'UNACKNOWLEDGED').length;
-  } catch (e) {}
+  const title = titles[currentRoute] || 'Command Center';
+  const name = (user && user.name) ? user.name : '';
+  const role = (user && user.role) ? user.role : '';
 
   return `
-    <header class="header glass-panel" style="padding: 14px 24px; border-radius: 0; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+    <header style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid rgba(255,255,255,0.08);background:rgba(8,12,22,0.85);backdrop-filter:blur(12px);flex-shrink:0;gap:12px;flex-wrap:wrap;">
       <div>
-        <div style="font-size: 11px; color: var(--text-dim); display: flex; align-items: center; gap: 6px; font-family: var(--font-mono);">
-          <span>NOVA CART</span><span>/</span><span style="color: var(--neon-cyan);">${title}</span>
-        </div>
-        <h1 style="font-size: 20px; font-weight: 700; color: #fff; margin-top: 2px;">${title}</h1>
+        <div style="font-size:11px;font-family:var(--font-mono);color:var(--text-dim);letter-spacing:1px;">NOVA CART</div>
+        <h1 style="font-size:18px;font-weight:700;color:#fff;margin:2px 0 0;">${title}</h1>
       </div>
-      <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-        <select id="role-selector" class="input-futuristic" style="width: auto; min-width: 130px; height: 36px; font-size: 12px;">
-          ${['CEO', 'Operations Manager', 'Marketing Manager', 'Store Manager', 'Analyst', 'Admin']
-            .map((r) => `<option value="${r}" ${displayRole === r ? 'selected' : ''}>Role: ${r}</option>`)
-            .join('')}
-        </select>
-        <a href="#/alerts" data-nav="#/alerts" style="position: relative; text-decoration: none; color: inherit; padding: 4px;">
-          <span style="font-size: 18px;">🔔</span>
-          ${unacknowledgedAlerts > 0 ? `<span style="position:absolute;top:-4px;right:-6px;background:#f43f5e;color:#fff;font-size:10px;border-radius:999px;padding:1px 5px;">${unacknowledgedAlerts}</span>` : ''}
-        </a>
-        <div style="display: flex; align-items: center; gap: 10px; padding: 4px 8px 4px 4px; border-radius: 999px; background: rgba(255,255,255,0.04);">
-          <div style="width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg, #00f3ff, #8b5cf6); display: flex; align-items: center; justify-content: center; font-weight: 700; color: #000;">${initial}</div>
-          <div style="line-height: 1.2; padding-right: 4px;">
-            <div style="font-size: 13px; font-weight: 600; color: #fff;">${displayName}</div>
-            <div style="font-size: 11px; color: var(--text-dim);">${displayRole}</div>
-          </div>
-        </div>
-        <button id="btn-download-pdf" class="btn-futuristic glow-cyan" type="button" style="font-size: 12px; padding: 8px 16px; height: 36px; white-space: nowrap;">⬇ Download PDF</button>
-        <button id="btn-logout" title="Logout" type="button" style="background: transparent; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; color: var(--text-dim); cursor: pointer; font-size: 14px; height: 36px; padding: 0 12px;">Logout</button>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        ${name ? `<div style="text-align:right;"><div style="font-size:13px;font-weight:600;color:#fff;">${name}</div><div style="font-size:11px;color:var(--text-dim);">${role}</div></div>` : ''}
+        <button type="button" id="btn-download-pdf" class="btn-futuristic-secondary" style="padding:8px 14px;font-size:12px;cursor:pointer;">📄 Download PDF</button>
+        <button type="button" id="btn-logout" class="btn-futuristic-secondary" style="padding:8px 14px;font-size:12px;cursor:pointer;">Logout</button>
       </div>
     </header>
   `;
