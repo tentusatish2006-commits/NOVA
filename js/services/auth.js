@@ -1,10 +1,15 @@
-// NOVA CART - Real Authentication & Session Service
-import { db } from './db.js';
+// NOVA CART - Auth: Supabase primary + local demo fallback
+import {
+  supabaseSignIn,
+  supabaseSignUp,
+  supabaseSignOut,
+  getStoredSession,
+  supabaseGetUser,
+} from './supabaseClient.js';
 
-const SESSION_KEY = 'nova_cart_active_session';
+const LOCAL_SESSION = 'nova_cart_active_session';
 const USERS_DB_KEY = 'nova_cart_registered_users';
 
-// Simple Hashing function (SHA-256 equivalent simulation)
 function hashPassword(str) {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -18,135 +23,147 @@ function hashPassword(str) {
 class AuthService {
   constructor() {
     this.users = this.loadUsers();
-    this.activeUser = this.loadSession();
+    this.activeUser = null;
   }
 
   loadUsers() {
     try {
       const stored = localStorage.getItem(USERS_DB_KEY);
       if (stored) return JSON.parse(stored);
-    } catch (e) {
-      console.warn("User DB access issue:", e);
-    }
-
-    // Default registered demo users
+    } catch (e) {}
     const defaultUsers = [
       {
-        id: "USR-001",
-        name: "Rahul Kumar",
-        email: "rahul@novacart.in",
-        passwordHash: hashPassword("password123"),
-        role: "CEO",
-        createdAt: "2026-09-01",
-        lastLogin: "2026-10-02 11:30"
+        id: 'USR-001',
+        name: 'Rahul Kumar',
+        email: 'rahul@novacart.in',
+        passwordHash: hashPassword('password123'),
+        role: 'CEO',
       },
       {
-        id: "USR-002",
-        name: "Priya Sharma",
-        email: "priya@novacart.in",
-        passwordHash: hashPassword("password123"),
-        role: "Operations Manager",
-        createdAt: "2026-09-05",
-        lastLogin: "2026-10-02 10:15"
+        id: 'USR-002',
+        name: 'Priya Sharma',
+        email: 'priya@novacart.in',
+        passwordHash: hashPassword('password123'),
+        role: 'Operations Manager',
       },
       {
-        id: "USR-003",
-        name: "Satish Kumar",
-        email: "satish@novacart.in",
-        passwordHash: hashPassword("password123"),
-        role: "Admin",
-        createdAt: "2026-08-20",
-        lastLogin: "2026-10-02 09:00"
-      }
+        id: 'USR-003',
+        name: 'Satish Kumar',
+        email: 'satish@novacart.in',
+        passwordHash: hashPassword('password123'),
+        role: 'Admin',
+      },
     ];
-
-    this.saveUsers(defaultUsers);
+    localStorage.setItem(USERS_DB_KEY, JSON.stringify(defaultUsers));
     return defaultUsers;
   }
 
-  saveUsers(users = this.users) {
-    this.users = users;
-    try {
-      localStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
-    } catch (e) {
-      console.error("Failed to save users database:", e);
+  async restoreSession() {
+    // Prefer Supabase session
+    const sb = getStoredSession();
+    if (sb?.access_token) {
+      try {
+        const user = await supabaseGetUser();
+        if (user) {
+          this.activeUser = user;
+          return user;
+        }
+      } catch (e) {
+        console.warn('Supabase session restore failed', e);
+      }
     }
-  }
-
-  loadSession() {
     try {
-      const stored = localStorage.getItem(SESSION_KEY);
-      if (stored) return JSON.parse(stored);
-    } catch (e) {
-      console.warn("Session access error:", e);
-    }
+      const raw = localStorage.getItem(LOCAL_SESSION);
+      if (raw) {
+        this.activeUser = JSON.parse(raw);
+        return this.activeUser;
+      }
+    } catch (e) {}
     return null;
   }
 
-  saveSession(user) {
-    this.activeUser = user;
-    if (user) {
-      localStorage.setItem(SESSION_KEY, JSON.stringify(user));
-    } else {
-      localStorage.removeItem(SESSION_KEY);
+  /** Real Supabase signup */
+  async signup({ name, email, password, role = 'CEO' }) {
+    try {
+      const result = await supabaseSignUp({ email, password, name, role });
+      if (result.needsConfirmation) {
+        return {
+          ok: true,
+          needsConfirmation: true,
+          message: result.message,
+          user: result.user,
+        };
+      }
+      this.activeUser = result.user;
+      localStorage.setItem(LOCAL_SESSION, JSON.stringify(result.user));
+      return { ok: true, user: result.user, needsConfirmation: false };
+    } catch (e) {
+      // Fallback: local-only signup if network/Supabase fails
+      console.warn('Supabase signup error, trying local:', e.message);
+      return this.localSignup({ name, email, password, role });
     }
   }
 
-  signup({ name, email, password, role = 'CEO' }) {
-    const existing = this.users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (existing) {
-      throw new Error("An account with this email already exists. Please login instead.");
-    }
-
-    const newUser = {
-      id: `USR-${Math.floor(100 + Math.random() * 900)}`,
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
+  localSignup({ name, email, password, role }) {
+    const existing = this.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    if (existing) return { ok: false, message: 'Email already registered (local).' };
+    const user = {
+      id: 'USR-' + Date.now(),
+      name,
+      email,
       passwordHash: hashPassword(password),
-      role: role || 'CEO',
-      createdAt: new Date().toISOString().split('T')[0],
-      lastLogin: new Date().toLocaleString()
+      role,
+      provider: 'local',
     };
-
-    this.users.push(newUser);
-    this.saveUsers();
-    this.saveSession(newUser);
-    return newUser;
+    this.users.push(user);
+    localStorage.setItem(USERS_DB_KEY, JSON.stringify(this.users));
+    const sessionUser = { id: user.id, name: user.name, email: user.email, role: user.role, provider: 'local' };
+    this.activeUser = sessionUser;
+    localStorage.setItem(LOCAL_SESSION, JSON.stringify(sessionUser));
+    return { ok: true, user: sessionUser, needsConfirmation: false };
   }
 
-  login({ email, password }) {
-    const cleanEmail = email.trim().toLowerCase();
-    const user = this.users.find(u => u.email.toLowerCase() === cleanEmail);
-
-    if (!user) {
-      throw new Error("Invalid email or password. Please check your credentials or create a new account.");
+  /** Real Supabase login */
+  async login({ email, password }) {
+    try {
+      const result = await supabaseSignIn({ email, password });
+      this.activeUser = result.user;
+      localStorage.setItem(LOCAL_SESSION, JSON.stringify(result.user));
+      return { ok: true, user: result.user };
+    } catch (e) {
+      // Demo local fallback (rahul@novacart.in / password123)
+      const local = this.users.find(
+        (u) => u.email.toLowerCase() === email.toLowerCase() && u.passwordHash === hashPassword(password)
+      );
+      if (local) {
+        const sessionUser = {
+          id: local.id,
+          name: local.name,
+          email: local.email,
+          role: local.role,
+          provider: 'local',
+        };
+        this.activeUser = sessionUser;
+        localStorage.setItem(LOCAL_SESSION, JSON.stringify(sessionUser));
+        return { ok: true, user: sessionUser, message: 'Signed in with local demo account.' };
+      }
+      return { ok: false, message: e.message || 'Invalid email or password' };
     }
-
-    if (user.passwordHash !== hashPassword(password)) {
-      throw new Error("Incorrect password for " + email + ". Please try again.");
-    }
-
-    user.lastLogin = new Date().toLocaleString();
-    this.saveUsers();
-    this.saveSession(user);
-    return user;
   }
 
-  logout() {
-    this.saveSession(null);
+  async logout() {
+    try {
+      await supabaseSignOut();
+    } catch (e) {}
+    this.activeUser = null;
+    localStorage.removeItem(LOCAL_SESSION);
+    localStorage.removeItem('nova_cart_user');
+    localStorage.removeItem('nova_cart_logged_in');
   }
 
-  getCurrentUser() {
+  getUser() {
     return this.activeUser;
-  }
-
-  isAuthenticated() {
-    return this.activeUser !== null;
-  }
-
-  getUsersList() {
-    return this.users;
   }
 }
 
-export const authService = new AuthService();
+export const auth = new AuthService();
