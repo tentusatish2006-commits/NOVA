@@ -1,4 +1,4 @@
-// NOVA CART - Master Application Router & Event Manager
+// NOVA CART - Master Application Router
 import { Canvas3D } from './components/3dCanvas.js';
 import { renderSidebar } from './components/Sidebar.js';
 import { renderHeader } from './components/Header.js';
@@ -28,13 +28,19 @@ import { renderBusinessSimulatorPage } from './pages/BusinessSimulator.js';
 import { renderAnalyticsPage } from './pages/Analytics.js';
 import { renderAlertsPage } from './pages/Alerts.js';
 
+function defaultUser() {
+  return { name: 'Dr. Satish Kumar', email: 'satish@novacart.in', role: 'CEO' };
+}
+
 class App {
   constructor() {
-    this.currentUser = JSON.parse(localStorage.getItem('nova_cart_user')) || {
-      name: 'Dr. Satish Kumar',
-      email: 'satish@novacart.in',
-      role: 'CEO'
-    };
+    try {
+      const raw = localStorage.getItem('nova_cart_user');
+      const u = raw ? JSON.parse(raw) : null;
+      this.currentUser = (u && u.role) ? u : defaultUser();
+    } catch (e) {
+      this.currentUser = defaultUser();
+    }
     this.custSegment = 'All';
     this.custSearch = '';
     this.storeCity = 'All';
@@ -62,6 +68,7 @@ class App {
   }
 
   setCurrentUserRole(role) {
+    if (!this.currentUser) this.currentUser = defaultUser();
     this.currentUser.role = role;
     localStorage.setItem('nova_cart_user', JSON.stringify(this.currentUser));
     this.render();
@@ -69,6 +76,7 @@ class App {
 
   logout() {
     localStorage.removeItem('nova_cart_user');
+    this.currentUser = defaultUser();
     window.location.hash = '#/login';
   }
 
@@ -80,6 +88,7 @@ class App {
   render() {
     const root = document.getElementById('app-root');
     if (!root) return;
+    if (!this.currentUser) this.currentUser = defaultUser();
 
     const isStandalone = this.currentRoute === '/' || this.currentRoute === '/login' || this.currentRoute === '/signup';
 
@@ -92,11 +101,12 @@ class App {
     }
 
     const mainPadding = this.currentRoute === '/live-map' ? '0' : '24px 32px';
+    const user = this.currentUser || defaultUser();
     root.innerHTML = `
       <div style="display:flex; width:100vw; height:100vh; overflow:hidden;">
         ${renderSidebar(this.currentRoute)}
         <div style="flex:1; display:flex; flex-direction:column; min-width:0; height:100vh; overflow:hidden;">
-          ${renderHeader(this.currentRoute, this.currentUser, (role) => this.setCurrentUserRole(role), () => this.logout())}
+          ${renderHeader(this.currentRoute, user, (role) => this.setCurrentUserRole(role), () => this.logout())}
           <main id="page-main" style="flex:1; display:flex; flex-direction:column; padding:${mainPadding}; overflow-y:auto; overflow-x:hidden;">
             ${this.renderRouteContent()}
           </main>
@@ -146,24 +156,18 @@ class App {
     document.querySelectorAll('[data-nav]').forEach(el => {
       el.addEventListener('click', (e) => {
         e.preventDefault();
-        const dest = el.getAttribute('data-nav') || el.getAttribute('href');
-        this.navigate(dest);
+        this.navigate(el.getAttribute('data-nav') || el.getAttribute('href'));
       });
     });
     document.querySelectorAll('a[href^="#/"]').forEach(a => {
       a.addEventListener('click', (e) => {
         const href = a.getAttribute('href');
-        if (href && href.startsWith('#/')) {
-          e.preventDefault();
-          this.navigate(href);
-        }
+        if (href && href.startsWith('#/')) { e.preventDefault(); this.navigate(href); }
       });
     });
-
     if (this.currentRoute === '/' || this.currentRoute === '') {
       try { initLandingN3D(); } catch (err) { console.warn('N3D init', err); }
     }
-
     document.querySelectorAll('.btn-demo-login').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -173,18 +177,16 @@ class App {
         this.navigate('#/dashboard');
       });
     });
-
     const loginForm = document.getElementById('login-form');
     if (loginForm) {
       loginForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const email = (document.getElementById('login-email') || {}).value || 'satish@novacart.in';
-        this.currentUser = { name: 'Dr. Satish Kumar', email, role: this.currentUser.role || 'CEO' };
+        this.currentUser = { name: 'Dr. Satish Kumar', email, role: (this.currentUser && this.currentUser.role) || 'CEO' };
         localStorage.setItem('nova_cart_user', JSON.stringify(this.currentUser));
         this.navigate('#/dashboard');
       });
     }
-
     const signupForm = document.getElementById('signup-form');
     if (signupForm) {
       signupForm.addEventListener('submit', (e) => {
@@ -209,29 +211,13 @@ class App {
     document.querySelectorAll('a[href^="#/"]').forEach(a => {
       a.addEventListener('click', (e) => {
         const href = a.getAttribute('href');
-        if (href && href.startsWith('#/')) {
-          e.preventDefault();
-          this.navigate(href);
-        }
+        if (href && href.startsWith('#/')) { e.preventDefault(); this.navigate(href); }
       });
     });
-
     const roleSel = document.getElementById('role-selector');
     if (roleSel) roleSel.addEventListener('change', (e) => this.setCurrentUserRole(e.target.value));
-
     const btnLogout = document.getElementById('btn-logout');
     if (btnLogout) btnLogout.addEventListener('click', () => this.logout());
-
-    const btnReset = document.getElementById('btn-reset-demo');
-    if (btnReset) {
-      btnReset.addEventListener('click', () => {
-        if (confirm('Reset Nova Cart demo telemetry dataset to case study baseline?')) {
-          db.reset();
-          alert('Demo dataset restored to baseline!');
-          this.render();
-        }
-      });
-    }
   }
 }
 
