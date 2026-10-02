@@ -1,4 +1,4 @@
-// NOVA CART - Router with working diagnosis + Ask AI + PDF download
+// NOVA CART - Router
 import { Canvas3D } from './components/3dCanvas.js';
 import { renderSidebar } from './components/Sidebar.js';
 import { renderHeader } from './components/TopBar.js';
@@ -11,9 +11,9 @@ import { renderExecutiveDashboard } from './pages/ExecutiveDashboard.js';
 import { renderBusinessDiagnosisPage, renderCausePanel, runFullDiagnosis } from './pages/BusinessDiagnosis.js';
 import { renderAIBusinessAnalystPage, runAIQuery } from './pages/AIBusinessAnalyst.js';
 import { renderCustomerIntelligencePage } from './pages/CustomerIntelligence.js';
-import { renderRetentionIntelligencePage } from './pages/RetentionIntelligence.js';
+import { renderRetentionIntelligencePage, triggerRescueAction } from './pages/RetentionIntelligence.js';
 import { renderCustomerSupportPage } from './pages/CustomerSupport.js';
-import { renderAISupportAssistantPage } from './pages/AISupportAssistant.js';
+import { renderAISupportAssistantPage, runSupportSynthesis } from './pages/AISupportAssistant.js';
 import { renderStoreIntelligencePage } from './pages/StoreIntelligence.js';
 import { renderInventoryIntelligencePage } from './pages/InventoryIntelligence.js';
 import { renderDeliveryOperationsPage } from './pages/DeliveryOperations.js';
@@ -105,18 +105,12 @@ class App {
   render() {
     const root = document.getElementById('app-root');
     if (!root) return;
-
     const publicRoutes = ['/', '/login', '/signup'];
     const isStandalone = publicRoutes.includes(this.currentRoute);
-
     if (!isStandalone && !this.isAuthenticated()) {
       localStorage.setItem('nova_cart_after_login', '#' + this.currentRoute);
-      if (this.currentRoute !== '/login') {
-        window.location.hash = '#/login';
-        return;
-      }
+      if (this.currentRoute !== '/login') { window.location.hash = '#/login'; return; }
     }
-
     if (isStandalone) {
       if (this.currentRoute === '/login') root.innerHTML = renderLoginPage((this.currentUser && this.currentUser.role) || 'CEO');
       else if (this.currentRoute === '/signup') root.innerHTML = renderSignupPage();
@@ -124,7 +118,6 @@ class App {
       this.bindStandaloneEvents();
       return;
     }
-
     const mainPadding = this.currentRoute === '/live-map' ? '0' : '24px 32px';
     const user = this.currentUser || { name: 'Guest', email: '', role: 'User' };
     root.innerHTML = `
@@ -138,7 +131,6 @@ class App {
         </div>
       </div>
     `;
-
     if (this.currentRoute === '/live-map') {
       setTimeout(() => initLiveMapLeaflet(this.storeCity !== 'All' ? this.storeCity : 'Bengaluru'), 120);
     }
@@ -199,7 +191,6 @@ class App {
     if (this.currentRoute === '/' || this.currentRoute === '') {
       try { initLandingN3D(); } catch (err) {}
     }
-
     document.querySelectorAll('.btn-demo-login').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -207,7 +198,6 @@ class App {
         this.completeLogin({ name: 'Demo ' + role, email: 'demo@novacart.in', role, provider: 'demo' });
       });
     });
-
     const loginForm = document.getElementById('login-form');
     if (loginForm) {
       loginForm.addEventListener('submit', async (e) => {
@@ -222,7 +212,6 @@ class App {
         else showAuthMessage(result.message || 'Invalid credentials');
       });
     }
-
     const signupForm = document.getElementById('signup-form');
     if (signupForm) {
       signupForm.addEventListener('submit', async (e) => {
@@ -250,14 +239,11 @@ class App {
         if (dest && dest.includes('#/')) { e.preventDefault(); this.navigate(dest); }
       });
     });
-
     const roleSel = document.getElementById('role-selector');
     if (roleSel) roleSel.addEventListener('change', (e) => this.setCurrentUserRole(e.target.value));
-
     const btnLogout = document.getElementById('btn-logout');
     if (btnLogout) btnLogout.addEventListener('click', () => this.logout());
 
-    // Download PDF (real file download after user name button)
     const btnPdf = document.getElementById('btn-download-pdf');
     if (btnPdf) {
       btnPdf.addEventListener('click', (e) => {
@@ -267,22 +253,15 @@ class App {
           <h2>Session</h2>
           <div class="card">User: <b>${u.name || ''}</b><br>Email: ${u.email || ''}<br>Role: ${u.role || ''}<br>Page: ${this.currentRoute}</div>
           <h2>Executive Snapshot</h2>
-          <div class="card"><p>Registered users: 120,000 · Monthly orders: 38,500 · Revenue: ₹26.1L · Repeat rate: 27%</p>
-          <p>AI summary: Acquisition growth is strong; retention, delivery SLA and support need intervention.</p></div>
-          <h2>Priority actions</h2>
-          <ul><li>Second-order retention intervention</li><li>Inventory pre-allocation engine</li><li>Delivery SLA for first 2 orders</li></ul>
+          <div class="card"><p>Registered users: 120,000 · Monthly orders: 38,500 · Revenue: ₹26.1L · Repeat rate: 27%</p></div>
         `);
       });
     }
 
-    // Business Diagnosis — cause tabs
     document.querySelectorAll('.cause-tab').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
-        document.querySelectorAll('.cause-tab').forEach((b) => {
-          b.classList.remove('btn-futuristic');
-          b.classList.add('btn-futuristic-secondary');
-        });
+        document.querySelectorAll('.cause-tab').forEach((b) => { b.classList.remove('btn-futuristic'); b.classList.add('btn-futuristic-secondary'); });
         btn.classList.remove('btn-futuristic-secondary');
         btn.classList.add('btn-futuristic');
         const cause = btn.getAttribute('data-cause') || 'retention';
@@ -291,7 +270,6 @@ class App {
       });
     });
 
-    // Run Full AI Diagnosis
     const btnDiag = document.getElementById('btn-run-diagnosis');
     if (btnDiag) {
       btnDiag.addEventListener('click', async (e) => {
@@ -299,36 +277,55 @@ class App {
         const original = btnDiag.textContent;
         btnDiag.disabled = true;
         btnDiag.textContent = 'Running AI Diagnosis…';
-        const container = document.getElementById('diagnosis-output-container');
-        await runFullDiagnosis(container);
+        await runFullDiagnosis(document.getElementById('diagnosis-output-container'));
         btnDiag.disabled = false;
         btnDiag.textContent = 'Diagnosis Complete ✓';
         setTimeout(() => { btnDiag.textContent = original; }, 2500);
       });
     }
 
-    // AI Business Analyst — form + presets
     const aiForm = document.getElementById('ai-analyst-form');
     if (aiForm) {
       aiForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const input = document.getElementById('ai-query-input');
-        const q = input ? input.value : '';
         const askBtn = document.getElementById('btn-ask-ai');
         if (askBtn) { askBtn.disabled = true; askBtn.textContent = 'Thinking…'; }
-        await runAIQuery(q);
+        await runAIQuery(input ? input.value : '');
         if (askBtn) { askBtn.disabled = false; askBtn.textContent = 'Ask AI →'; }
       });
     }
     document.querySelectorAll('.btn-preset-query').forEach((btn) => {
       btn.addEventListener('click', async (e) => {
         e.preventDefault();
-        const q = btn.getAttribute('data-question') || btn.textContent.replace(/^💬\s*/, '');
+        const q = btn.getAttribute('data-question') || '';
         const input = document.getElementById('ai-query-input');
         if (input) input.value = q;
         await runAIQuery(q);
       });
     });
+
+    // Retention — Trigger Rescue Action
+    document.querySelectorAll('.btn-trigger-retention').forEach((btn) => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        await triggerRescueAction(btn.getAttribute('data-custid') || '', btn);
+      });
+    });
+
+    // AI Support — Retrieve & Synthesize
+    const supportForm = document.getElementById('support-lookup-form');
+    if (supportForm) {
+      supportForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const cust = (document.getElementById('supp-cust-input') || {}).value || '';
+        const order = (document.getElementById('supp-order-input') || {}).value || '';
+        const btn = document.getElementById('btn-support-synthesize');
+        if (btn) { btn.disabled = true; btn.textContent = 'Synthesizing…'; }
+        await runSupportSynthesis(cust, order);
+        if (btn) { btn.disabled = false; btn.textContent = '🔍 Retrieve & Synthesize'; }
+      });
+    }
 
     document.querySelectorAll('.btn-analytics-tab').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -340,15 +337,7 @@ class App {
     const btnCsv = document.getElementById('btn-export-csv');
     if (btnCsv) {
       btnCsv.addEventListener('click', () => {
-        downloadCsv('nova-analytics.csv', [
-          ['Metric', 'Value'],
-          ['Registered Users', '120000'],
-          ['Monthly Orders', '38500'],
-          ['Revenue', '2610000'],
-          ['Repeat Rate', '27%'],
-          ['Cancellation Rate', '11%'],
-          ['Avg Delivery Min', '37'],
-        ]);
+        downloadCsv('nova-analytics.csv', [['Metric','Value'],['Registered Users','120000'],['Monthly Orders','38500'],['Revenue','2610000'],['Repeat Rate','27%']]);
       });
     }
 
@@ -361,9 +350,7 @@ class App {
 
     document.querySelectorAll('.btn-ack-alert').forEach((btn) => {
       btn.addEventListener('click', () => {
-        try {
-          if (db.acknowledgeAlert) db.acknowledgeAlert(btn.getAttribute('data-altid'));
-        } catch (e) {}
+        try { if (db.acknowledgeAlert) db.acknowledgeAlert(btn.getAttribute('data-altid')); } catch (e) {}
         btn.textContent = 'Acknowledged';
         btn.disabled = true;
       });
