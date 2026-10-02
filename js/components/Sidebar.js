@@ -1,4 +1,4 @@
-// NOVA CART - Sidebar Navigation
+// NOVA CART - Sidebar Navigation (no live map)
 export function renderSidebar(currentRoute = '/dashboard') {
   const sections = [
     {
