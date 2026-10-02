@@ -1,7 +1,7 @@
 // NOVA CART - Master Application Router
 import { Canvas3D } from './components/3dCanvas.js';
 import { renderSidebar } from './components/Sidebar.js';
-import { renderHeader } from './components/Header.js';
+import { renderHeader } from './components/TopBar.js';
 import { openModal } from './components/Modal.js';
 import { db } from './services/db.js';
 import { aiEngine } from './services/aiEngine.js';
@@ -41,12 +41,9 @@ class App {
     } catch (e) {
       this.currentUser = defaultUser();
     }
-    this.custSegment = 'All';
-    this.custSearch = '';
-    this.storeCity = 'All';
-    this.storeSearch = '';
-    this.deliveryStatus = 'All';
-    this.analyticsTab = 'Finance';
+    this.custSegment = 'All'; this.custSearch = '';
+    this.storeCity = 'All'; this.storeSearch = '';
+    this.deliveryStatus = 'All'; this.analyticsTab = 'Finance';
     this.parseRoute();
     this.init();
   }
@@ -61,8 +58,7 @@ class App {
   }
 
   init() {
-    try { this.canvas = new Canvas3D('canvas-container'); }
-    catch (e) { console.warn('3D canvas init error fallback:', e); }
+    try { this.canvas = new Canvas3D('canvas-container'); } catch (e) { console.warn('3D canvas fallback', e); }
     window.addEventListener('hashchange', () => { this.parseRoute(); this.render(); });
     this.render();
   }
@@ -182,7 +178,7 @@ class App {
       loginForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const email = (document.getElementById('login-email') || {}).value || 'satish@novacart.in';
-        this.currentUser = { name: 'Dr. Satish Kumar', email, role: (this.currentUser && this.currentUser.role) || 'CEO' };
+        this.currentUser = { name: 'Dr. Satish Kumar', email, role: 'CEO' };
         localStorage.setItem('nova_cart_user', JSON.stringify(this.currentUser));
         this.navigate('#/dashboard');
       });
@@ -202,16 +198,10 @@ class App {
   }
 
   bindAppEvents() {
-    document.querySelectorAll('[data-nav]').forEach(el => {
+    document.querySelectorAll('[data-nav], a[href^="#/"]').forEach(el => {
       el.addEventListener('click', (e) => {
-        e.preventDefault();
-        this.navigate(el.getAttribute('data-nav') || el.getAttribute('href'));
-      });
-    });
-    document.querySelectorAll('a[href^="#/"]').forEach(a => {
-      a.addEventListener('click', (e) => {
-        const href = a.getAttribute('href');
-        if (href && href.startsWith('#/')) { e.preventDefault(); this.navigate(href); }
+        const dest = el.getAttribute('data-nav') || el.getAttribute('href');
+        if (dest && dest.includes('#/')) { e.preventDefault(); this.navigate(dest); }
       });
     });
     const roleSel = document.getElementById('role-selector');
