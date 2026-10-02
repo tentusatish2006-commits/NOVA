@@ -1,4 +1,4 @@
-// NOVA CART - Router with Supabase Auth + PDF/buttons
+// NOVA CART - Router with working diagnosis + Ask AI + PDF download
 import { Canvas3D } from './components/3dCanvas.js';
 import { renderSidebar } from './components/Sidebar.js';
 import { renderHeader } from './components/TopBar.js';
@@ -8,8 +8,8 @@ import { downloadPdfReport, downloadCsv } from './services/pdfExport.js';
 import { renderLandingPage, initLandingN3D } from './pages/HomeLanding.js';
 import { renderLoginPage, renderSignupPage, showAuthMessage } from './pages/AuthPages.js';
 import { renderExecutiveDashboard } from './pages/ExecutiveDashboard.js';
-import { renderBusinessDiagnosisPage } from './pages/BusinessDiagnosis.js';
-import { renderAIBusinessAnalystPage } from './pages/AIBusinessAnalyst.js';
+import { renderBusinessDiagnosisPage, renderCausePanel, runFullDiagnosis } from './pages/BusinessDiagnosis.js';
+import { renderAIBusinessAnalystPage, runAIQuery } from './pages/AIBusinessAnalyst.js';
 import { renderCustomerIntelligencePage } from './pages/CustomerIntelligence.js';
 import { renderRetentionIntelligencePage } from './pages/RetentionIntelligence.js';
 import { renderCustomerSupportPage } from './pages/CustomerSupport.js';
@@ -131,7 +131,7 @@ class App {
       <div style="display:flex; width:100vw; height:100vh; overflow:hidden;">
         ${renderSidebar(this.currentRoute)}
         <div style="flex:1; display:flex; flex-direction:column; min-width:0; height:100vh; overflow:hidden;">
-          ${renderHeader(this.currentRoute, user, (role) => this.setCurrentUserRole(role), () => this.logout())}
+          ${renderHeader(this.currentRoute, user)}
           <main id="page-main" style="flex:1; display:flex; flex-direction:column; padding:${mainPadding}; overflow-y:auto; overflow-x:hidden;">
             ${this.renderRouteContent()}
           </main>
@@ -250,16 +250,20 @@ class App {
         if (dest && dest.includes('#/')) { e.preventDefault(); this.navigate(dest); }
       });
     });
+
     const roleSel = document.getElementById('role-selector');
     if (roleSel) roleSel.addEventListener('change', (e) => this.setCurrentUserRole(e.target.value));
+
     const btnLogout = document.getElementById('btn-logout');
     if (btnLogout) btnLogout.addEventListener('click', () => this.logout());
 
+    // Download PDF (real file download after user name button)
     const btnPdf = document.getElementById('btn-download-pdf');
     if (btnPdf) {
-      btnPdf.addEventListener('click', () => {
+      btnPdf.addEventListener('click', (e) => {
+        e.preventDefault();
         const u = this.currentUser || {};
-        downloadPdfReport('NOVA CART Report — ' + (this.currentRoute || 'dashboard'), `
+        downloadPdfReport('NOVA_CART_Report_' + (this.currentRoute || 'dashboard').replace(/\//g, ''), `
           <h2>Session</h2>
           <div class="card">User: <b>${u.name || ''}</b><br>Email: ${u.email || ''}<br>Role: ${u.role || ''}<br>Page: ${this.currentRoute}</div>
           <h2>Executive Snapshot</h2>
@@ -271,27 +275,82 @@ class App {
       });
     }
 
+    // Business Diagnosis — cause tabs
+    document.querySelectorAll('.cause-tab').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.querySelectorAll('.cause-tab').forEach((b) => {
+          b.classList.remove('btn-futuristic');
+          b.classList.add('btn-futuristic-secondary');
+        });
+        btn.classList.remove('btn-futuristic-secondary');
+        btn.classList.add('btn-futuristic');
+        const cause = btn.getAttribute('data-cause') || 'retention';
+        const panel = document.getElementById('cause-explorer-content');
+        if (panel) panel.innerHTML = renderCausePanel(cause);
+      });
+    });
+
+    // Run Full AI Diagnosis
+    const btnDiag = document.getElementById('btn-run-diagnosis');
+    if (btnDiag) {
+      btnDiag.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const original = btnDiag.textContent;
+        btnDiag.disabled = true;
+        btnDiag.textContent = 'Running AI Diagnosis…';
+        const container = document.getElementById('diagnosis-output-container');
+        await runFullDiagnosis(container);
+        btnDiag.disabled = false;
+        btnDiag.textContent = 'Diagnosis Complete ✓';
+        setTimeout(() => { btnDiag.textContent = original; }, 2500);
+      });
+    }
+
+    // AI Business Analyst — form + presets
+    const aiForm = document.getElementById('ai-analyst-form');
+    if (aiForm) {
+      aiForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('ai-query-input');
+        const q = input ? input.value : '';
+        const askBtn = document.getElementById('btn-ask-ai');
+        if (askBtn) { askBtn.disabled = true; askBtn.textContent = 'Thinking…'; }
+        await runAIQuery(q);
+        if (askBtn) { askBtn.disabled = false; askBtn.textContent = 'Ask AI →'; }
+      });
+    }
+    document.querySelectorAll('.btn-preset-query').forEach((btn) => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const q = btn.getAttribute('data-question') || btn.textContent.replace(/^💬\s*/, '');
+        const input = document.getElementById('ai-query-input');
+        if (input) input.value = q;
+        await runAIQuery(q);
+      });
+    });
+
     document.querySelectorAll('.btn-analytics-tab').forEach((btn) => {
-      btn.addEventListener('click', () => { this.analyticsTab = btn.getAttribute('data-tab') || 'Finance'; this.render(); });
+      btn.addEventListener('click', () => {
+        this.analyticsTab = btn.getAttribute('data-tab') || 'Finance';
+        this.render();
+      });
     });
 
     const btnCsv = document.getElementById('btn-export-csv');
     if (btnCsv) {
       btnCsv.addEventListener('click', () => {
-        downloadCsv('nova-analytics.csv', [['Metric','Value'],['Registered Users','120000'],['Monthly Orders','38500'],['Revenue','2610000'],['Repeat Rate','27%'],['Cancellation Rate','11%'],['Avg Delivery Min','37']]);
+        downloadCsv('nova-analytics.csv', [
+          ['Metric', 'Value'],
+          ['Registered Users', '120000'],
+          ['Monthly Orders', '38500'],
+          ['Revenue', '2610000'],
+          ['Repeat Rate', '27%'],
+          ['Cancellation Rate', '11%'],
+          ['Avg Delivery Min', '37'],
+        ]);
       });
     }
-
-    document.querySelectorAll('.cause-tab').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.cause-tab').forEach((b) => { b.classList.remove('btn-futuristic'); b.classList.add('btn-futuristic-secondary'); });
-        btn.classList.remove('btn-futuristic-secondary');
-        btn.classList.add('btn-futuristic');
-        const cause = btn.getAttribute('data-cause');
-        const panel = document.getElementById('cause-detail-panel');
-        if (panel && cause) panel.innerHTML = '<p style="color:var(--text-muted);font-size:13px;">Showing analysis for <b style="color:#fff;">' + cause + '</b>.</p>';
-      });
-    });
 
     document.querySelectorAll('.btn-rec-action').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -302,19 +361,13 @@ class App {
 
     document.querySelectorAll('.btn-ack-alert').forEach((btn) => {
       btn.addEventListener('click', () => {
-        try { if (db.acknowledgeAlert) db.acknowledgeAlert(btn.getAttribute('data-altid')); } catch (e) {}
+        try {
+          if (db.acknowledgeAlert) db.acknowledgeAlert(btn.getAttribute('data-altid'));
+        } catch (e) {}
         btn.textContent = 'Acknowledged';
         btn.disabled = true;
       });
     });
-
-    const btnDiag = document.getElementById('btn-run-diagnosis');
-    if (btnDiag) {
-      btnDiag.addEventListener('click', () => {
-        btnDiag.textContent = 'Running AI Diagnosis…';
-        setTimeout(() => { btnDiag.textContent = 'Diagnosis Complete ✓'; this.navigate('#/diagnosis'); }, 600);
-      });
-    }
   }
 }
 
