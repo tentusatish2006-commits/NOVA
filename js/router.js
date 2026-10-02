@@ -143,6 +143,7 @@ class App {
         case '/stores': return renderStoreIntelligencePage();
         case '/inventory': return renderInventoryIntelligencePage();
         case '/delivery': return renderDeliveryOperationsPage(this.deliveryStatus);
+        case '/live-map': window.location.hash = '#/delivery'; return '<div class="glass-card" style="padding:24px;">Redirecting…</div>';
         case '/delivery-prediction': case '/ai-delivery': return renderAIDeliveryPredictionPage();
         case '/cancellations': return renderCancellationIntelligencePage();
         case '/marketing': return renderMarketingIntelligencePage();
@@ -212,7 +213,7 @@ class App {
         const password = (document.getElementById('signup-password') || {}).value || '';
         const role = (document.getElementById('signup-role') || {}).value || 'CEO';
         const btn = document.getElementById('signup-submit');
-        if (btn) { btn.disabled = true; btn.textContent = 'Creating account…'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'Create Account'; }
         const result = await auth.signup({ name, email, password, role });
         if (btn) { btn.disabled = false; btn.textContent = 'Create Account'; }
         if (result.ok) {
@@ -311,17 +312,26 @@ class App {
       });
     }
 
+    // AI Delay Prediction — synchronous, reliable binding
     const btnPred = document.getElementById('btn-run-delivery-pred');
     if (btnPred) {
-      btnPred.addEventListener('click', async (e) => {
+      btnPred.onclick = (e) => {
         e.preventDefault();
-        btnPred.disabled = true;
-        const prev = btnPred.textContent;
-        btnPred.textContent = 'Predicting…';
-        await runDeliveryPrediction();
-        btnPred.disabled = false;
-        btnPred.textContent = prev;
-      });
+        e.stopPropagation();
+        try {
+          btnPred.disabled = true;
+          const prev = btnPred.textContent;
+          btnPred.textContent = 'Predicting…';
+          runDeliveryPrediction();
+          btnPred.disabled = false;
+          btnPred.textContent = prev;
+        } catch (err) {
+          btnPred.disabled = false;
+          btnPred.textContent = '⚡ Run AI Delay Prediction';
+          const box = document.getElementById('delivery-pred-output');
+          if (box) box.innerHTML = '<div style="color:#f87171;">' + (err.message || err) + '</div>';
+        }
+      };
     }
 
     const btnCancelPlan = document.getElementById('btn-gen-cancel-plan');
@@ -332,7 +342,6 @@ class App {
       });
     }
 
-    // Customer View
     document.querySelectorAll('.btn-view-customer').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -340,7 +349,6 @@ class App {
       });
     });
 
-    // Store View Details
     document.querySelectorAll('.btn-store-detail').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
@@ -348,7 +356,6 @@ class App {
       });
     });
 
-    // Business Simulator
     if (this.currentRoute === '/simulator') {
       try { initSimulatorControls(); } catch (e) {}
       const btnSim = document.getElementById('btn-run-sim');
